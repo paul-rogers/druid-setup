@@ -1,11 +1,12 @@
 import yaml
 from os import path
 from .group import ConfigGroup
+from . import consts
 
 prop_names = [
-    'druidHome',
-    'target',
-    'baseConfig'
+    consts.DRUID_HOME_KEY,
+    consts.TARGET_KEY,
+    consts.BASE_CONFIG_KEY
 ]
 
 def extract_props(source, keys):
@@ -36,14 +37,14 @@ class Template:
         props = extract_props(self.raw, prop_names)
         self.main_group = ConfigGroup(props)
         try:
-            context = self.raw['context']
+            context = self.raw[consts.CONTEXT_KEY]
         except KeyError:
             context = {}
         self.context_group = ConfigGroup(context)
 
     def includes(self):
         try:
-            includes = self.raw['include']
+            includes = self.raw[consts.INCLUDE_KEY]
         except KeyError:
             return []
         return [path.join(self.dir, f) for f in includes]

@@ -1,3 +1,5 @@
 druidHome: /Users/paul/bin/apache-druid-2022.01.0-iap-SNAPSHOT
 target: /tmp/test
-baseConfig: conf/druid/single-server/micro-quickstart
+baseConfig: micro-quickstart
+context:
+  label: example

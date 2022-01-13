@@ -1,4 +1,5 @@
 import re
+from . import consts
 
 comment = '([^"#]*)(?:#|//)(.*)'
 
@@ -6,8 +7,8 @@ class PropsParser:
 
     def __init__(self):
         self.props = {
-            'comments': {},
-            'properties': {}
+            consts.COMMENTS_KEY: {},
+            consts.PROPERTIES_KEY: {}
         }
         self.comment = []
 
@@ -33,9 +34,9 @@ class PropsParser:
             print("Bad properties line: " + line)
             return
         key = line[0:posn]
-        self.props['properties'][key] = line[posn+1:]
+        self.props[consts.PROPERTIES_KEY][key] = line[posn+1:]
         if len(self.comment) > 0:
-            self.props['comments'][key] = self.comment
+            self.props[consts.COMMENTS_KEY][key] = self.comment
             self.comment = []
 
 class PropertiesCodec:
@@ -45,10 +46,10 @@ class PropertiesCodec:
 
     def write(self, config, file_path):
         with open(file_path, 'w') as f:
-            for k, v in config['properties'].items():
+            for k, v in config[consts.PROPERTIES_KEY].items():
                 try:
                     f.write('\n')
-                    comments = config['comments'][k]
+                    comments = config[consts.COMMENTS_KEY][k]
                     for line in comments:
                         f.write("# {}\n".format(line))
                 except KeyError:

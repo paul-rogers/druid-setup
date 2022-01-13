@@ -7,6 +7,8 @@ class Context:
         self.user_context = user
     
     def replace(self, orig, local_context={}):
+        if orig is None:
+            return orig
         if type(orig) != str:
             return orig
         rewritten = orig
@@ -19,16 +21,26 @@ class Context:
             head = rewritten[0:m.start(0)]
             tail = rewritten[m.end(0):]
             var = m.group(1)
-            subs = None
-            try:
-                subs = local_context[var]
-            except KeyError:
-                try:
-                    subs = self.user_context[var]
-                except KeyError:
-                    try:
-                        subs = self.root_context[var]
-                    except KeyError:
-                        raise Exception("Cannot find value for variable {} in '{}'".format(var, orig))
+            subs = self.require(var)
             rewritten = head + str(subs) + tail
         return rewritten
+
+    def get_value(self, key):
+        try:
+            return self.user_context[key]
+        except KeyError:
+            pass
+        try:
+            return self.root_context[key]
+        except KeyError:
+            return None
+    
+    def get(self, key):
+        return self.replace(self.get_value(key))
+    
+    def require(self, key):
+        value = self.get_value(key)
+        if value is None:
+            raise Exception("Variable " + key + " is not defined.")
+        return value
+        
