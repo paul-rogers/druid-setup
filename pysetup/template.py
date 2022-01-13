@@ -34,13 +34,11 @@ class Template:
         self.gather_props()
 
     def gather_props(self):
-        props = extract_props(self.raw, prop_names)
-        self.main_group = ConfigGroup(props)
+        self.kw_props = extract_props(self.raw, prop_names)
         try:
-            context = self.raw[consts.CONTEXT_KEY]
+            self.context_props = self.raw[consts.CONTEXT_KEY]
         except KeyError:
-            context = {}
-        self.context_group = ConfigGroup(context)
+            self.context_props = {}
 
     def includes(self):
         try:

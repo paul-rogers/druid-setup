@@ -1,64 +1,52 @@
 import re
 from . import consts
 
-class GroupStack:
-
-    def __init__(self, base):
-        self.stack = [base]
-        self.expanded = None
-
-    def resolve(self, context):
-        for i in range(self.length):
-            self.merge_group(i)
-        self.top().expand(context)
-
-    def top(self):
-        return self.stack[-1]
-
-    def merge_group(self, index):
-        group = self.stack[index]
-        if group._merged is not None:
-            return
-        if index == 0:
-            group._merged = group.config
-            return
-        group.merge(self.stack[index + 1])
-
-    def get(self, key, context):
-        return context.get(key, self.top()._resolved)
-
 class ConfigGroup:
 
     def __init__(self, config):
         self.config = config
+        self.parent = None
         self._merged = None
-        self._expanded = None
+        self._resolved = None
+
+    def merged(self) -> dict:
+        if self._merged is None:
+            if self.parent is None:
+                self._merged = self.config
+            else:
+                self._merged = self.merge(self.parent.merged())
+        return self._merged
+
+    def resolve(self, context):
+        self._resolved = self.expand(self.merged(), context)
 
     def merge(self, parent):
-        self._merged = parent.copy()
-        merge_recursive(self._merged, self.config)
+        return merge_recursive(parent, self.config)
 
-    def expand(self, context):
-        self._expanded = resolve_recursive(self._merged, self._merged, context)
+    def expand(self, config, context):
+        return resolve_recursive(config, context)
+
+    def resolved(self):
+        return self._resolved
 
 class JvmGroup(ConfigGroup):
 
     def __init__(self, config):
         ConfigGroup.__init__(self, config)
 
-    def expand(self, context) :
-        self._expanded = resolve_recursive(self._merged, None, context)
+    def expand(self, config, context) :
+        return resolve_recursive(self._merged, context)
 
 class PropertiesGroup(ConfigGroup):
 
     def __init__(self, config):
         ConfigGroup.__init__(self, config)
 
-    def expand(self, context):
-        props = self._merged[consts.PROPERTIES_KEY]
-        self._expanded = {
-            consts.COMMENTS_KEY: self._merged[consts.COMMENTS_KEY],
-            consts.PROPERTIES_KEY: resolve_recursive(props, context, props)
+    def expand(self, config, context):
+        props = config[consts.PROPERTIES_KEY]
+        return {
+            consts.COMMENTS_KEY: config[consts.COMMENTS_KEY],
+            consts.PROPERTIES_KEY: resolve_recursive(props, context)
         }
  
 def merge_recursive(base, config) -> dict:
@@ -75,13 +63,13 @@ def merge_recursive(base, config) -> dict:
             merged[k] = v
     return merged
 
-def resolve_recursive(config, context, local):
+def resolve_recursive(config, context):
     resolved = {}
     for k, v in config.items():
         if v is None:
             continue
         if type(v) == dict:
-            resolved[k] = resolve_recursive(v, context, local)
+            resolved[k] = resolve_recursive(v, context)
         else:
-            resolved[k] = context.replace(v, local)
+            resolved[k] = context.replace(v)
     return resolved    

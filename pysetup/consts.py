@@ -22,6 +22,8 @@ SYSTEM_KEY = 'system'
 CONTEXT_KEY = 'context'
 INCLUDE_KEY = 'include'
 COMMENTS_KEY = 'comments'
+MAIN_KEY = 'main'
+LOG4J_KEY = 'log4j'
 
 # Distro names
 APACHE_DISTRO = 'apache'

@@ -2,9 +2,13 @@ import re
 
 class Context:
 
-    def __init__(self, root, user):
-        self.root_context = root
-        self.user_context = user
+    def __init__(self, root):
+        self.layers = [root]
+
+    def add(self, layer):
+        if layer is None or len(layer) == 0:
+            return
+        self.layers.append(layer)
     
     def replace(self, orig, local_context={}):
         if orig is None:
@@ -26,14 +30,12 @@ class Context:
         return rewritten
 
     def get_value(self, key):
-        try:
-            return self.user_context[key]
-        except KeyError:
-            pass
-        try:
-            return self.root_context[key]
-        except KeyError:
-            return None
+        for layer in reversed(self.layers):
+            try:
+                return layer[key]
+            except KeyError:
+                pass
+        return None
     
     def get(self, key):
         return self.replace(self.get_value(key))
@@ -43,4 +45,10 @@ class Context:
         if value is None:
             raise Exception("Variable " + key + " is not defined.")
         return value
+
+    def keys(self):
+        keys = set()
+        for layer in self.layers:
+            keys.update(layer.keys())
+        return keys
         

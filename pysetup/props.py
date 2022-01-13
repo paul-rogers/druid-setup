@@ -48,8 +48,8 @@ class PropertiesCodec:
         with open(file_path, 'w') as f:
             for k, v in config[consts.PROPERTIES_KEY].items():
                 try:
-                    f.write('\n')
                     comments = config[consts.COMMENTS_KEY][k]
+                    f.write('\n')
                     for line in comments:
                         f.write("# {}\n".format(line))
                 except KeyError:

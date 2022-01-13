@@ -18,12 +18,14 @@ class Model:
     def load(self, template):
         self.template_name = template
         self.templates = [Template(template)]
-        self.root_context = {}
         self.expand_includes(self.templates[0])
         self.build_context()
-        self.resolve_specs()
+        self.build_default_config()
         self.verify()
         self.load_services()
+        self.apply_service_defaults()
+        self.apply_service_overrides()
+        self.resolve_services()
     
     def expand_includes(self, template):
         for f in template.includes():
@@ -48,13 +50,36 @@ class Model:
             consts.TODAY_KEY: datetime.datetime.today().isoformat(),
             consts.DISCLAIMER_KEY: consts.DISCLAIMER
         }
-        self.context = Context(self.root_context, {})
+        self.context = Context(self.root_context)
+        self.walk_includes(
+            lambda template: self.add_context(self.context, template))
 
-    def resolve_specs(self):
-        top = self.templates[0]
-        self.user_context = top.context_group.resolve(self.context)
-        self.context = Context(self.root_context, self.user_context)
-        self.specs = top.main_group.resolve(self.context)
+    @staticmethod
+    def add_context(context, template):
+        context.add(template.context_props)
+        context.add(template.kw_props)
+
+    def build_default_config(self):
+        self.default_config = {
+            consts.ZK_SERVICE: {
+                consts.PROPERTIES_KEY: {
+                    'dataDir': '$dataDir/zk'
+                }
+            }
+        }
+    
+    def walk_includes(self, fn):
+        for include in self.templates:
+            include.touched = False
+        self.visit_template(self.templates[0], fn)
+    
+    def visit_template(self, template, fn):
+        if template.touched:
+            return
+        template.touched = True
+        for include in template.dependencies:
+            self.visit_template(include, fn)
+        fn(template)
 
     def verify(self):
         self.verify_druid()
@@ -63,7 +88,7 @@ class Model:
 
     def verify_druid(self):
         try:
-            self.druid_home = self.specs[consts.DRUID_HOME_KEY]
+            self.druid_home = self.context.get(consts.DRUID_HOME_KEY)
             self.root_context[consts.DRUID_HOME_KEY] = self.druid_home
         except KeyError:
             raise Exception("'" + consts.DRUID_HOME_KEY + "' is not set.")
@@ -81,7 +106,7 @@ class Model:
 
     def verify_target(self):
         try:
-            self.target = self.specs[consts.TARGET_KEY]
+            self.target = self.context.get(consts.TARGET_KEY)
             self.root_context[consts.TARGET_KEY] = self.target
         except KeyError:
             raise Exception("'" + consts.TARGET_KEY + "' is not set.")
@@ -93,7 +118,7 @@ class Model:
     
     def verify_base(self):
         try:
-            base_config = self.specs[consts.BASE_CONFIG_KEY]
+            base_config = self.context.get(consts.BASE_CONFIG_KEY)
             self.root_context[consts.BASE_CONFIG_KEY] = base_config
         except KeyError:
             raise Exception("'" + consts.BASE_CONFIG_KEY + "' is not set.")
@@ -140,20 +165,31 @@ class Model:
             service.load_base(full_path)
             self.services[f] = service
 
+    def resolve_services(self):
+        for service in self.services.values():
+            service.resolve(self.context)
+
+    def apply_service_defaults(self):
+        for key, service in self.services.items():
+            try:
+                service.apply_config(self.default_config[key])
+            except KeyError:
+                pass
+    
+    def apply_service_overrides(self):
+        pass
+
     def build(self):
         builder = ConfigBuilder(self)
         builder.build()
 
     def print_config(self):
-        print("Root Context:")
-        for k in sort_keys(self.root_context):
-            print_value(k, self.root_context[k])
-        print("\nCustom Context:")
-        for k in sort_keys(self.user_context):
-            print_value(k, self.user_context[k])
+        print("Context:")
+        for k in sort_keys(self.context.keys()):
+            print_value(k, self.context.get_value(k))
 
-def sort_keys(d):
-    keys = [k for k in d.keys()]
+def sort_keys(s):
+    keys = [k for k in s]
     keys.sort()
     return keys
 
