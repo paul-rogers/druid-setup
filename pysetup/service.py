@@ -1,147 +1,146 @@
 from os import path
 import os, shutil
-from .jvm import JvmCodec
-from .group import ConfigGroup, PropertiesGroup, JvmGroup
-from .codec import MainCodec, FileCodec
-from .props import PropertiesCodec
+from .jvm import jvmCodec
+from .codec import mainCodec, fileCodec
+from .props import propertiesCodec
+from .group import ConfigStack, ConfigGroup
 from . import consts
+
+class ResourceDefn:
+
+    def __init__(self, key, codec, file_name):
+        self.key = key
+        self.codec = codec
+        self.file_name = file_name
+
+class ServiceDefn:
+
+    def __init__(self, resources):
+        self.config = {}
+        for resource in resources:
+            self.config[resource.key] = resource
+    
+    def has_key(self, key):
+        self.config.get(key) is not None
+    
+    def codec_for(self, key):
+        try:
+            return self.config[key].codec
+        except KeyError:
+            return None
+
+    def resources(self):
+        return self.config.values()
+    
+    def keys(self):
+        return self.config.keys()
+    
+    def build_data_dir(self, context):
+        pass
+
+class ZkServiceDefn(ServiceDefn):
+
+    def __init__(self):
+        ServiceDefn.__init__(self,
+            [jvmResource, zkResource, log4jResource])
+    
+    def build_data_dir(self, context):
+        zk_data_dir = context.get(consts.ZK_DATA_DIR_KEY)
+        os.makedirs(zk_data_dir)
+
+jvmResource = ResourceDefn(
+    consts.JVM_KEY,
+    jvmCodec,
+    consts.JVM_CONFIG_FILE)
+
+runtimeResource = ResourceDefn(
+    consts.PROPERTIES_KEY,
+    propertiesCodec,
+    consts.RUNTIME_PROPERTIES_FILE)
+
+commonResource = ResourceDefn(
+    consts.PROPERTIES_KEY,
+    propertiesCodec,
+    consts.COMMON_PROPERTIES_FILE)
+
+mainResource = ResourceDefn(
+    consts.MAIN_KEY,
+    mainCodec,
+    consts.MAIN_CONFIG_FILE)
+
+log4jResource = ResourceDefn(
+    consts.LOG4J_KEY,
+    fileCodec,
+    consts.LOG4J_FILE)
+
+zkResource = ResourceDefn(
+    consts.ZK_KEY,
+    propertiesCodec,
+    consts.ZOO_CFG_FILE)
+
+druidService = ServiceDefn([
+    jvmResource,
+    runtimeResource,
+    mainResource])
+
+services = {
+    consts.HISTORICAL_SERVICE: druidService,
+    consts.BROKER_SERVICE: druidService,
+    consts.ROUTER_SERVICE: druidService,
+    consts.OVERLORD_SERVICE: druidService,
+    consts.MASTER_SERVICE: druidService,
+    consts.INDEXER_SERVICE: druidService,
+    consts.PEON_SERVICE: druidService,
+    consts.COMMON_SERVICE: ServiceDefn([
+        jvmResource,
+        commonResource,
+        log4jResource]),
+    consts.ZK_SERVICE: ServiceDefn([
+        jvmResource,
+        zkResource,
+        log4jResource])
+    }
 
 class Service:
 
-    def __init__(self, name, keys):
+    def __init__(self, name, defn):
         self.name = name
-        self.keys = keys
+        self.defn = defn
         self.base_config = {}
-        self.overrides = []
-        self.resolved = {}
+        self.overrides = ConfigStack()
 
     def load_base(self, conf_dir):
-        raise NotImplementedError()
-
-    def apply_config(self, config):
-        raise NotImplementedError()
-
-    def resolve(self, context):
-        self.stitch()
-        for v in self.resolved.values():
-            v.resolve(context)
-
-    def stitch(self):
-        self.resolved = self.base_config.copy()
-        for override in self.overrides:
-            for key in self.keys:
-                try:
-                    group = override[key]
-                    try:
-                        group.parent = self.resolved[key]
-                    except KeyError:
-                        pass
-                    self.resolved[key] = group
-                except KeyError:
-                    pass
-
-    def build(self, target_dir, context):
-        raise NotImplementedError()
-
-class DruidService(Service):
-
-    def __init__(self, name):
-        Service.__init__(self, name, [
-            consts.JVM_KEY,
-            consts.PROPERTIES_KEY,
-            consts.MAIN_KEY
-        ])
-
-    def load_base(self, service_dir):
-        self.base_config = {
-            consts.JVM_KEY: 
-                JvmGroup(JvmCodec().read(path.join(service_dir, consts.JVM_CONFIG_FILE))),
-            consts.PROPERTIES_KEY: 
-                PropertiesGroup(PropertiesCodec().read(path.join(service_dir, consts.RUNTIME_PROPERTIES_FILE))),
-            consts.MAIN_KEY:
-                ConfigGroup(MainCodec().read(path.join(service_dir, consts.MAIN_CONFIG_FILE)))
-        }
-
-
-    def apply_config(self, defaults):
-        pass
-class CommonService(Service):
-
-    def __init__(self):
-        Service.__init__(self, consts.COMMON_DIR, [
-            consts.PROPERTIES_KEY,
-            consts.LOG4J_KEY
-        ])
-
-    def load_base(self, service_dir):
-        self.base_config = {
-            consts.PROPERTIES_KEY: 
-                PropertiesGroup(PropertiesCodec().read(path.join(service_dir, consts.COMMON_PROPERTIES_FILE))),
-            consts.LOG4J_KEY:
-                ConfigGroup(FileCodec().read(path.join(service_dir, consts.LOG4J_FILE)))
-        }
-
-class ZkService(Service):
-    """
-    Represents the ZooKeeper service.
-    """
-
-    def __init__(self):
-        Service.__init__(self, consts.ZK_SERVICE, [
-            consts.JVM_KEY,
-            consts.PROPERTIES_KEY
-        ])
-
-    def load_base(self, service_dir):
-        self.source_dir = service_dir
-        self.base_config = {
-            consts.JVM_KEY: 
-                JvmGroup(JvmCodec().read(path.join(service_dir, consts.JVM_CONFIG_FILE))),
-            consts.PROPERTIES_KEY: 
-                ConfigGroup(PropertiesCodec().read(path.join(service_dir, consts.ZOO_CFG_FILE)))
-        }
+        for resource in self.defn.resources():
+            self.load_resource(conf_dir, resource)
+        self.overrides.add(ConfigGroup(self.base_config))
+    
+    def load_resource(self, conf_dir, resource):
+        file_path = path.join(conf_dir, resource.file_name)
+        if not path.isfile(file_path):
+            return
+        self.base_config[resource.key] = ConfigGroup(resource.codec.read(file_path))
 
     def apply_config(self, config):
         layer = {}
-        try:
-            layer[consts.JVM_KEY] = JvmGroup(config[consts.JVM_KEY])
-        except KeyError:
-            pass
-        try:
-            layer[consts.PROPERTIES_KEY] = ConfigGroup({
-                consts.PROPERTIES_KEY: config[consts.PROPERTIES_KEY]})
-        except KeyError:
-            pass
-        if len(layer) > 0:
-            print("layer:", layer)
-            self.overrides.append(layer)
-
-    def build(self, dest_dir, context):
-        os.makedirs(dest_dir)
-        zk_data_dir = context.get(consts.ZK_DATA_DIR_KEY)
-        os.makedirs(zk_data_dir)
-        self.write_jvm_config(dest_dir)
-        self.write_zoo_cfg(dest_dir)
- 
-        for f in os.listdir(self.source_dir):
-            if f == consts.ZOO_CFG_FILE or f == consts.JVM_CONFIG_FILE:
+        for resource in self.defn.resources():
+            values = config.get(resource.key, None)
+            if values is None or len(values) == 0:
                 continue
-            source_path = path.join(self.source_dir, f)
-            dest_path = path.join(dest_dir, f)
-            shutil.copyfile(source_path, dest_path)
+            layer[resource.key] = resource.codec.encode(values)
+        self.overrides.add(layer)
 
-    def write_jvm_config(self, dest_dir):
-        try:
-            JvmCodec().write(
-                self.resolved[consts.JVM_KEY].resolved(),
-                path.join(dest_dir, consts.ZOO_CFG_FILE))
-        except KeyError:
-            pass
+    def resolve(self, context):
+        self.overrides.resolve(context)
 
-    def write_zoo_cfg(self, dest_dir):
-        try:
-            PropertiesCodec().write(
-                self.resolved[consts.PROPERTIES_KEY].resolved(),
-                path.join(dest_dir, consts.ZOO_CFG_FILE))
-        except KeyError:
-            pass
+    def build_config(self, dest_dir, context):
+        os.makedirs(dest_dir)
+        for resource in self.defn.resources():
+            config = self.overrides.get(resource.key)
+            if config is None:
+                continue
+            resource.codec.write(config.resolved(),
+                path.join(dest_dir, resource.file_name))
+    
+    def build_data(self, dest_dir, context):
+        self.defn.build_data_dir(context)
+

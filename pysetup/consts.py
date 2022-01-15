@@ -13,7 +13,19 @@ README_KEY = 'readme'
 TODAY_KEY = 'today'
 DISCLAIMER_KEY = 'disclaimer'
 
+# Service names
+HISTORICAL_SERVICE = 'historical'
+BROKER_SERVICE = 'broker'
+ROUTER_SERVICE = 'router'
+OVERLORD_SERVICE = 'overlord'
+MASTER_SERVICE = 'coordinatorOverlord'
+INDEXER_SERVICE = 'indexer'
+PEON_SERVICE = 'peon'
+COMMON_SERVICE = '_common'
+ZK_SERVICE = 'zk'
+
 # Template keys
+ZK_KEY = 'zk'
 
 # Other properties
 PROPERTIES_KEY = 'properties'
@@ -24,6 +36,10 @@ INCLUDE_KEY = 'include'
 COMMENTS_KEY = 'comments'
 MAIN_KEY = 'main'
 LOG4J_KEY = 'log4j'
+JVM_ARGS_KEY = "args"
+
+# Unset value marker
+NULL_VALUE = "<null>"
 
 # Distro names
 APACHE_DISTRO = 'apache'
@@ -41,8 +57,6 @@ LOG4J_FILE = 'log4j2.xml'
 ZOO_CFG_FILE = 'zoo.cfg'
 
 # Service Names
-COMMON_DIR = '_common'
-ZK_SERVICE = 'zk'
 
 # Misc
 DISCLAIMER = 'Generated Druid Config - Do Not Edit'

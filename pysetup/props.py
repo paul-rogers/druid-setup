@@ -1,15 +1,26 @@
 import re
+from .codec import tombstone, Value
 from . import consts
 
 comment = '([^"#]*)(?:#|//)(.*)'
 
+class ConfigValue(Value):
+
+    def __init__(self, value, comments=None):
+        Value.__init__(self, value)
+        self.comments = comments
+
+    def write(self, key, out):
+        if self.comments is not None and len(self.comments) > 0:
+            for line in self.comments:
+                out.write("# {}\n".format(line))
+        if self.value is not None:
+            out.write("{}={}\n".format(key, self.value))
+
 class PropsParser:
 
     def __init__(self):
-        self.props = {
-            consts.COMMENTS_KEY: {},
-            consts.PROPERTIES_KEY: {}
-        }
+        self.props = {}
         self.comment = []
 
     def parse(self, file_path):
@@ -20,6 +31,9 @@ class PropsParser:
 
     def parse_line(self, line):
         line = line.strip()
+        if len(line) == 0:
+            self.comment.append(line)
+            return
         m = re.fullmatch(comment, line)
         if m is not None:
             line = m.group(1).strip()
@@ -34,10 +48,8 @@ class PropsParser:
             print("Bad properties line: " + line)
             return
         key = line[0:posn]
-        self.props[consts.PROPERTIES_KEY][key] = line[posn+1:]
-        if len(self.comment) > 0:
-            self.props[consts.COMMENTS_KEY][key] = self.comment
-            self.comment = []
+        self.props[key] = ConfigValue(line[posn+1:], self.comment)
+        self.comment = []
 
 class PropertiesCodec:
 
@@ -46,14 +58,17 @@ class PropertiesCodec:
 
     def write(self, config, file_path):
         with open(file_path, 'w') as f:
-            for k, v in config[consts.PROPERTIES_KEY].items():
-                try:
-                    comments = config[consts.COMMENTS_KEY][k]
-                    f.write('\n')
-                    for line in comments:
-                        f.write("# {}\n".format(line))
-                except KeyError:
-                    pass
-                if v is None:
-                    continue
-                f.write("{}={}\n".format(k, v))
+            for k, v in config.items():
+                if v is not None:
+                    v.write(k, f)
+
+    def encode(self, config):
+        encoded = {}
+        for k, v in config.items():
+            if v == consts.NULL_VALUE:
+                encoded[k] = tombstone
+            else:
+                encoded[k] = ConfigValue(v)
+        return encoded
+
+propertiesCodec = PropertiesCodec()
