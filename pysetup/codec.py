@@ -1,29 +1,3 @@
-class Value:
-
-    def __init__(self, value):
-        self.value = value
-
-    def merge(self, parent):
-        return self
-
-    def resolve(self, context):
-        if self.value is None:
-            return self
-        resolved = context.replace(self.value)
-        if resolved == self.value:
-            return self
-        return type(self)(resolved)
-
-    def __str__(self):
-        return str(self.value)
-
-class Tombstone(Value):
-
-    def __init__(self):
-        Value.__init__(self, None)
-
-tombstone = Tombstone()
-
 class Codec:
 
     def read(self, file_path):

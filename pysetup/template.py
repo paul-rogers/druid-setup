@@ -1,6 +1,5 @@
 import yaml
 from os import path
-from .group import ConfigGroup
 from . import consts
 
 prop_names = [

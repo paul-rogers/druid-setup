@@ -2,8 +2,8 @@ import unittest
 import tempfile
 import filecmp
 from os import path
-from pysetup import consts
 from pysetup.props import propertiesCodec
+from pysetup.props import parse_value, format_value
 
 class TestPropertiesCodec(unittest.TestCase):
 
@@ -18,6 +18,20 @@ class TestPropertiesCodec(unittest.TestCase):
             propertiesCodec.write(config, dest)
             expected = 'data/out-runtime.properties'
             self.assertTrue(filecmp.cmp(dest, expected))
+
+    def test_format_parser(self):
+        key = 'druid.extensions.loadList'
+        value = '["druid-hdfs-storage", "druid-kafka-indexing-service", "druid-datasketches"]'
+        parsed = parse_value(key, value)
+        self.assertIs(type(parsed), list)
+        self.assertEqual(3, len(parsed))
+        self.assertEqual("druid-hdfs-storage", parsed[0])
+
+        fmt = format_value(key, parsed)
+        self.assertEqual(value, fmt)
+
+        self.assertEqual('bar', parse_value('foo', 'bar'))
+        self.assertEqual('bar', format_value('foo', 'bar'))
 
 if __name__ == '__main__':
     unittest.main()

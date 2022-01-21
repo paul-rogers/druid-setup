@@ -3,7 +3,6 @@ import os, shutil
 from .jvm import jvmCodec
 from .codec import mainCodec, fileCodec
 from .props import propertiesCodec
-from .group import ConfigStack, ConfigGroup
 from . import consts
 
 class ResourceDefn:
@@ -74,7 +73,7 @@ log4jResource = ResourceDefn(
     consts.LOG4J_FILE)
 
 zkResource = ResourceDefn(
-    consts.ZK_KEY,
+    consts.PROPERTIES_KEY,
     propertiesCodec,
     consts.ZOO_CFG_FILE)
 

@@ -1,6 +1,7 @@
-from .codec import tombstone
 from .context import Context
 from .util import sort_keys, format_pair
+from .consts import TOMBSTONE
+
 
 class ConfigStack:
 
@@ -28,9 +29,9 @@ class ConfigStack:
         return merged
 
     def resolve(self, context):
-        result = self.merge()
-        resolve(result, context)
-        return FinalConfig(result)
+        merged = self.merge()
+        resolved = resolve(merged, context)
+        return FinalConfig(resolved)
 
     def to_context(self, sys_context):
         return Context(sys_context, self.merge())
@@ -73,7 +74,7 @@ def search(config, key):
     value = config.get(key[0])
     if value is None:
         return (None, False)
-    elif value is tombstone:
+    elif value is TOMBSTONE:
         return (None, True)
     elif type(value) is dict:
         return search(value, key[1:])
@@ -84,7 +85,7 @@ def search(config, key):
 
 def merge(merged, overlay):
     for k, v in overlay.items():
-        if v is tombstone:
+        if v is TOMBSTONE:
             merged.pop(k, None)
             continue
         existing = merged.get(k, None)

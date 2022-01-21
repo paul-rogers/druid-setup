@@ -76,3 +76,4 @@ Distro kind:    $distro
 Base config:    $baseConfig
 """
 
+TOMBSTONE = '<unset>'

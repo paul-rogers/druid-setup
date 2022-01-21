@@ -1,6 +1,6 @@
 import unittest
 
-from pysetup.config2 import ConfigStack
+from pysetup.config import ConfigStack
 from pysetup.context import Context
 from pysetup.codec import tombstone
 

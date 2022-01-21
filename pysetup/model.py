@@ -4,7 +4,7 @@ import datetime
 
 from .template import Template
 from .builder import ConfigBuilder
-from .config2 import ConfigStack
+from .config import ConfigStack
 from .service import Service
 from . import consts
 
@@ -167,6 +167,52 @@ class Model:
             consts.ZK_SERVICE: {
                 consts.PROPERTIES_KEY: {
                     'dataDir': '$dataDir/zk'
+                }
+            },
+            consts.COMMON_SERVICE: {
+                consts.PROPERTIES_KEY: {
+                    'druid.indexer.logs.directory': '$dataDir/druid/indexing-logs',
+                    'druid.storage.storageDirectory': '$dataDir/druid/segments'
+                }
+            },
+            consts.BROKER_SERVICE: {
+                consts.PROPERTIES_KEY: {
+                    'druid.processing.tmpDir': '$dataDir/druid/processing'
+                }
+            },
+            consts.MASTER_SERVICE: {
+                consts.PROPERTIES_KEY: {
+                    'derby.stream.error.file': '$dataDir/druid/derby.log'
+                }
+            },
+            consts.HISTORICAL_SERVICE: {
+                consts.JVM_KEY: {
+                    consts.PROPERTIES_KEY: {
+                        'java.io.tmpdir': '$dataDir/tmp'
+                    }
+                },
+                consts.PROPERTIES_KEY: {
+                    'druid.processing.tmpDir': '$dataDir/druid/processing',
+                    'druid.segmentCache.locations': [{
+                        "path":"$dataDir/druid/segment-cache",
+                        "maxSize":"300g"}]
+                }
+            },
+            consts.MIDDLE_MANAGER_SERVICE: {
+                consts.JVM_KEY: {
+                    consts.PROPERTIES_KEY: {
+                        'java.io.tmpdir': '$dataDir/tmp'
+                    }
+                },
+                consts.PROPERTIES_KEY: {
+                    'druid.indexer.task.hadoopWorkingPath': '$dataDir/druid/hadoop-tmp',
+                }
+            },
+            consts.ROUTER_SERVICE: {
+                consts.JVM_KEY: {
+                    consts.PROPERTIES_KEY: {
+                        'java.io.tmpdir': '$dataDir/tmp'
+                    }
                 }
             }
         }

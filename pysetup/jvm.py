@@ -12,6 +12,32 @@ arg_key = "Xm."
 
 arg_keys = {'Xms', 'Xmx'}
 
+class Formatter:
+
+    def __init__(self, formatters, default_format):
+        self.formatters = formatters
+        self.default_format = default_format
+
+    def format(self, key, value, out):
+        format_fn = self.formatters.get(key, None)
+        if format_fn is None:
+            format_fn = self.default_format
+        return format_fn(key, value, out)
+
+def arg_formatter(key, value, out):
+    out.write("-{}{}\n".format(key, value))
+
+def std_formatter(key, value, out):
+    if value is None or len(value) == 0:
+        out.write("-{}\n".format(key))
+    else:
+        out.write("-{}={}\n".format(key, value))
+
+formatter = Formatter({
+    'Xms': arg_formatter,
+    'Xmx': arg_formatter},
+    std_formatter)
+
 class JvmCodec:
 
     def read(self, file_path):
@@ -55,12 +81,7 @@ class JvmCodec:
         if args is None:
             return
         for k, v in args.items():
-            if v is None or len(v) == 0:
-                out.write("-{}\n".format(k))
-            elif k in arg_keys:
-                out.write("-{}{}\n".format(k, v))
-            else:
-                out.write("-{}={}\n".format(k, v))
+            formatter.format(k, v, out)
 
     def write_system_props(self, out, config):
         props = config.get(consts.PROPERTIES_KEY)

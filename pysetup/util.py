@@ -1,4 +1,4 @@
-from .codec import tombstone
+from .consts import TOMBSTONE
 
 def sort_keys(s):
     keys = [k for k in s]
@@ -16,7 +16,7 @@ def format_pair(key, value, prefix):
     return prefix + key + ': ' + format_value(value, prefix)
 
 def format_value(value, prefix):
-    if value is None or value is tombstone:
+    if value is None or value is TOMBSTONE:
         return '<unset>'
     if type(value) is dict:
         return format_dict(value, prefix )
@@ -32,7 +32,7 @@ def format_value(value, prefix):
 
 def format_block(value, prefix):
     lines = value.strip().split('\n')
-    format_list(lines, prefix)
+    return format_list(lines, prefix)
 
 def format_list(value, prefix):
     s = '"""\n'

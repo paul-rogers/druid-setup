@@ -1,13 +1,12 @@
-import re
-from .codec import tombstone, Value
+import re, json
 from . import consts
 
 comment = '([^"#]*)(?:#|//)(.*)'
 
-class ConfigValue(Value):
+class ConfigValue:
 
     def __init__(self, value, comments=None):
-        Value.__init__(self, value)
+        self.value = value
         self.comments = comments
 
     def write(self, key, out):
@@ -15,7 +14,42 @@ class ConfigValue(Value):
             for line in self.comments:
                 out.write("# {}\n".format(line))
         if self.value is not None:
-            out.write("{}={}\n".format(key, self.value))
+            write_value(key, self.value, out)
+
+    def __str__(self):
+        return str(self.value)
+
+class JsonPropertyCodec:
+
+    def parse(self, value):
+        return json.loads(value)
+
+    def format(self, value):
+        return json.dumps(value)
+
+json_property_codec = JsonPropertyCodec()
+
+special_props = {
+    'druid.extensions.loadList': json_property_codec,
+    'druid.monitoring.monitors': json_property_codec,
+    'druid.server.hiddenProperties': json_property_codec,
+    'druid.segmentCache.locations': json_property_codec,
+}
+
+def parse_value(key, value):
+    fmt = special_props.get(key, None)
+    if fmt is None:
+        return value
+    return fmt.parse(value)
+
+def format_value(key, value):
+    fmt = special_props.get(key, None)
+    if fmt is None:
+        return value
+    return fmt.format(value)
+
+def write_value(key, value, out):
+    out.write("{}={}\n".format(key, format_value(key, value)))
 
 class PropsParser:
 
@@ -48,8 +82,15 @@ class PropsParser:
             print("Bad properties line: " + line)
             return
         key = line[0:posn]
-        self.props[key] = ConfigValue(line[posn+1:], self.comment)
-        self.comment = []
+        value = line[posn+1:]
+        fmt = special_props.get(key, None)
+        if fmt is not None:
+            value = fmt.parse(value)
+        if len(self.comment) == 0:
+            self.props[key] = value
+        else:
+            self.props[key] = ConfigValue(value, self.comment)
+            self.comment = []
 
 class PropertiesCodec:
 
@@ -62,15 +103,6 @@ class PropertiesCodec:
                 if type(v) == ConfigValue:
                     v.write(k, f)
                 else:
-                    f.write("{}={}\n".format(k, v))
-
-    def encode(self, config):
-        encoded = {}
-        for k, v in config.items():
-            if v == consts.NULL_VALUE:
-                encoded[k] = tombstone
-            else:
-                encoded[k] = ConfigValue(v)
-        return encoded
+                    write_value(k, v, f)
 
 propertiesCodec = PropertiesCodec()
