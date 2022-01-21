@@ -59,8 +59,10 @@ class PropertiesCodec:
     def write(self, config, file_path):
         with open(file_path, 'w') as f:
             for k, v in config.items():
-                if v is not None:
+                if type(v) == ConfigValue:
                     v.write(k, f)
+                else:
+                    f.write("{}={}\n".format(k, v))
 
     def encode(self, config):
         encoded = {}

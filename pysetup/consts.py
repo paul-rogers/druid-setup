@@ -1,4 +1,4 @@
-# Root context
+# Context
 DRUID_HOME_KEY = 'druidHome'
 TEMPLATE_KEY = 'template'
 TEMPLATE_PATH_KEY = 'templatePath'
@@ -18,25 +18,28 @@ HISTORICAL_SERVICE = 'historical'
 BROKER_SERVICE = 'broker'
 ROUTER_SERVICE = 'router'
 OVERLORD_SERVICE = 'overlord'
-MASTER_SERVICE = 'coordinatorOverlord'
+MASTER_SERVICE = 'coordinator-overlord'
+MIDDLE_MANAGER_SERVICE = 'middleManager'
 INDEXER_SERVICE = 'indexer'
 PEON_SERVICE = 'peon'
 COMMON_SERVICE = '_common'
 ZK_SERVICE = 'zk'
 
 # Template keys
-ZK_KEY = 'zk'
+SERVICES_KEY = 'services'
+INCLUDE_KEY = 'include'
+CONTEXT_KEY = 'context'
+COMMON_KEY = 'common'
+CONFIG_DIR_KEY = 'configDir'
 
 # Other properties
 PROPERTIES_KEY = 'properties'
 JVM_KEY = 'jvm'
 SYSTEM_KEY = 'system'
-CONTEXT_KEY = 'context'
-INCLUDE_KEY = 'include'
-COMMENTS_KEY = 'comments'
 MAIN_KEY = 'main'
 LOG4J_KEY = 'log4j'
-JVM_ARGS_KEY = "args"
+JVM_ARGS_KEY = 'args'
+ZK_KEY = 'zk'
 
 # Unset value marker
 NULL_VALUE = "<null>"
@@ -55,6 +58,7 @@ MAIN_CONFIG_FILE = 'main.config'
 COMMON_PROPERTIES_FILE = 'common.runtime.properties'
 LOG4J_FILE = 'log4j2.xml'
 ZOO_CFG_FILE = 'zoo.cfg'
+COMMON_DIR = '_common'
 
 # Service Names
 

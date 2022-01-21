@@ -1,0 +1,18 @@
+target: $home/apps/example
+configDir: $targetDir/config
+dataDir: $home/data/example
+baseConfig: micro-quickstart
+include:
+  - base.yaml
+  - /tmp/std.yaml
+context:
+  heapMem: 2G
+  directMem: 1G
+  dataDir: doomed
+services:
+  historical:
+    runtime:
+      foo: bar
+    jvm:
+      foo:
+

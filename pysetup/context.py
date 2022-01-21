@@ -1,11 +1,13 @@
 import re
 
+from .util import sort_keys, format_value, format_pair, format_block
 class Context:
     """
     Represents a simple key/value store for configuration properties.
 
-    A context is a stack of dictionaries, in which upper dictionaries
-    override lower ones.
+    A context is created from a stack of dictionaries, in which upper
+    dictionaries override lower ones. The actual overriding is done
+    during the stack flattening proces.
 
     The Context holds a set of values, typically strings. Values are not
     of the Value class because context values are not serialized.
@@ -47,19 +49,15 @@ class Context:
       "foo=$foo" will loop forever.
     """
 
-    def __init__(self):
-        self.layers = []
+    def __init__(self, system, mapping):
+        self.system_props = system
+        self.mapping = mapping
 
-    def add(self, layer):
-        if layer is None or len(layer) == 0:
-            return
-        self.layers.append(layer)
-    
-    def replace(self, orig, local_context={}):
+    def replace(self, orig):
         if orig is None:
-            return orig
+            return ""
         if type(orig) != str:
-            return orig
+            return str(orig)
         rewritten = orig
         while True:
             m = re.search(r'\$\{([^\}]+)\}', rewritten)
@@ -71,29 +69,46 @@ class Context:
             tail = rewritten[m.end(0):]
             var = m.group(1)
             subs = self.require(var)
-            rewritten = head + str(subs) + tail
+            subs = '' if subs is None else str(subs)
+            rewritten = head + subs + tail
         return rewritten
 
     def get_value(self, key):
-        for layer in reversed(self.layers):
-            try:
-                return layer[key]
-            except KeyError:
-                pass
-        return None
+        value = self.system_props.get(key)
+        if value is not None:
+            return value
+        return self.mapping.get(key, None)
     
     def get(self, key):
         return self.replace(self.get_value(key))
     
     def require(self, key):
-        value = self.get_value(key)
-        if value is None:
-            raise Exception("Variable " + key + " is not defined.")
-        return value
+        value = self.system_props.get(key)
+        if value is not None:
+            return value
+        try:
+            return self.mapping[key]
+        except KeyError:
+            raise Exception("Variable '" + key + "' is not defined.") from None
 
     def keys(self):
-        keys = set()
-        for layer in self.layers:
-            keys.update(layer.keys())
+        keys = set(self.system_props.keys()).copy()
+        keys.update(self.mapping.keys())
         return keys
-        
+
+    def __str__(self):
+        s = ''
+        for k in sort_keys(self.keys()):
+            raw = self.get_value(k)
+            if type(raw) is not str:
+                s += format_pair(k, raw, '') + '\n'
+                continue
+            final = self.get(k)
+            s += format_pair(k, raw, '')
+            if raw == final:
+                s += '\n'
+            elif '\n' in final:
+                s += ' (' + format_block(final, '') + ')\n'
+            else:
+                s += ' (' + format_value(final, '') + ')\n'
+        return s

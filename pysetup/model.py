@@ -3,8 +3,9 @@ from os import path
 import datetime
 
 from .template import Template
-from .context import Context
 from .builder import ConfigBuilder
+from .config2 import ConfigStack
+from .service import Service
 from . import consts
 
 class Model:
@@ -16,13 +17,16 @@ class Model:
         self.template_name = template
         self.templates = [Template(template)]
         self.expand_includes(self.templates[0])
+        self.context_stack = ConfigStack()
+        self.config_stack = ConfigStack()
+        self.build_system_context()
+        self.build_root_context()
         self.build_context()
+        self.verify_target()
+        self.load_base_config()
         self.build_default_config()
-        self.verify()
-        self.load_services()
-        self.apply_service_defaults()
-        self.apply_service_overrides()
-        self.resolve_services()
+        self.build_user_config()
+        self.resolve_config()
     
     def expand_includes(self, template):
         for f in template.includes():
@@ -37,34 +41,28 @@ class Model:
                 self.expand_includes(include)
             template.add_depenency(include)
 
-    def build_context(self):
-        self.root_context = {
+    def build_system_context(self):
+        self.system_context = {
             consts.TEMPLATE_KEY: self.template_name,
             consts.TEMPLATE_PATH_KEY: self.templates[0].file_path,
+            consts.TODAY_KEY: datetime.datetime.today().isoformat(),
+        }
+
+    def build_root_context(self):
+        root_context = {
             consts.DATA_DIR_KEY: '$target/var',
             consts.ZK_DATA_DIR_KEY: '$dataDir/zk',
             consts.README_KEY: consts.DEFAULT_README,
-            consts.TODAY_KEY: datetime.datetime.today().isoformat(),
             consts.DISCLAIMER_KEY: consts.DISCLAIMER
         }
-        self.context = Context(self.root_context)
+        self.context_stack.add(root_context)
+
+    def build_context(self):
         self.walk_includes(
-            lambda template: self.add_context(self.context, template))
+            lambda template: self.context_stack.add(template.context())
+        )
+        self.context = self.context_stack.to_context(self.system_context)
 
-    @staticmethod
-    def add_context(context, template):
-        context.add(template.context_props)
-        context.add(template.kw_props)
-
-    def build_default_config(self):
-        self.default_config = {
-            consts.ZK_SERVICE: {
-                consts.PROPERTIES_KEY: {
-                    'dataDir': '$dataDir/zk'
-                }
-            }
-        }
-    
     def walk_includes(self, fn):
         for include in self.templates:
             include.touched = False
@@ -78,34 +76,9 @@ class Model:
             self.visit_template(include, fn)
         fn(template)
 
-    def verify(self):
-        self.verify_druid()
-        self.verify_target()
-        self.verify_base()
-
-    def verify_druid(self):
-        try:
-            self.druid_home = self.context.get(consts.DRUID_HOME_KEY)
-            self.root_context[consts.DRUID_HOME_KEY] = self.druid_home
-        except KeyError:
-            raise Exception("'" + consts.DRUID_HOME_KEY + "' is not set.")
-        if not path.isdir(self.druid_home):
-            raise Exception("Druid home does not exist: " + self.druid_home)
-        if path.isfile(path.join(self.druid_home, 'README')):
-            self.distro_type = consts.APACHE_DISTRO
-            self.root_context[consts.DISTRO_KEY] = self.distro_type
-            return
-        if path.isfile(path.join(self.druid_home, 'build.name')):
-            self.distro_type = consts.IMPLY_DISTRO
-            self.root_context[consts.DISTRO_KEY] = self.distro_type
-            return
-        raise Exception("Druid home is not a Druid distro?: " + self.druid_home)
-
     def verify_target(self):
-        try:
-            self.target = self.context.get(consts.TARGET_KEY)
-            self.root_context[consts.TARGET_KEY] = self.target
-        except KeyError:
+        self.target = self.context.get(consts.TARGET_KEY)
+        if self.target is None:
             raise Exception("'" + consts.TARGET_KEY + "' is not set.")
         if not path.isdir(self.target):
             return
@@ -113,12 +86,38 @@ class Model:
             return
         raise Exception('Target exists, but was not generated: ' + self.target)
     
+    def load_base_config(self):
+        self.verify_druid()
+        config_dir = self.context.get(consts.BASE_CONFIG_KEY)
+        if config_dir is None or len(config_dir) == 0:
+            print("Warning: no base config set.")
+            return
+        self.verify_base()
+        self.services = {}
+        self.load_zk()
+        self.load_druid_services()
+        self.build_service_config()
+
+    def verify_druid(self):
+        self.druid_home = self.context.get(consts.DRUID_HOME_KEY)
+        if self.druid_home is None:
+            raise Exception("'" + consts.DRUID_HOME_KEY + "' is not set.")
+        if not path.isdir(self.druid_home):
+            raise Exception("Druid home does not exist: " + self.druid_home)
+        if path.isfile(path.join(self.druid_home, 'README')):
+            self.distro_type = consts.APACHE_DISTRO
+            self.system_context[consts.DISTRO_KEY] = self.distro_type
+            return
+        if path.isfile(path.join(self.druid_home, 'build.name')):
+            self.distro_type = consts.IMPLY_DISTRO
+            self.system_context[consts.DISTRO_KEY] = self.distro_type
+            return
+        raise Exception("Druid home is not a Druid distro?: " + self.druid_home)
+
     def verify_base(self):
-        try:
-            base_config = self.context.get(consts.BASE_CONFIG_KEY)
-            self.root_context[consts.BASE_CONFIG_KEY] = base_config
-        except KeyError:
-            raise Exception("'" + consts.BASE_CONFIG_KEY + "' is not set.")
+        base_config = self.context.get(consts.BASE_CONFIG_KEY)
+        if base_config is None:
+            return
         search_path = ['', 'conf', 'conf/druid', 'conf/druid/single-server', 'conf/druid/cluster']
         for p in search_path:
             guess = self.druid_home
@@ -127,15 +126,10 @@ class Model:
             guess = path.join(guess, base_config)
             if path.isdir(guess) and path.isdir(path.join(guess, consts.COMMON_DIR)):
                 self.base_config = guess
-                self.root_context[consts.BASE_CONFIG_PATH_KEY] = self.base_config
+                self.system_context[consts.BASE_CONFIG_PATH_KEY] = self.base_config
                 return
         raise Exception('Base config not found: ' + base_config)
         
-    def load_services(self):
-        self.services = {}
-        self.load_zk()
-        self.load_druid_services()
-
     def load_zk(self):
         """
         ZK is not within the named config directory: it is in
@@ -144,10 +138,10 @@ class Model:
         self.zk_dir = path.join(self.druid_home, 'conf', 'zk')
         if not path.isdir(self.zk_dir):
             raise Exception("No zK found: " + self.zk_dir)
-        service = ZkService()
+        service = Service(consts.ZK_SERVICE)
         service.load_base(self.zk_dir)
         self.services[consts.ZK_SERVICE] = service
-        self.root_context[consts.BASE_ZK_DIR_KEY] = self.zk_dir
+        self.system_context[consts.BASE_ZK_DIR_KEY] = self.zk_dir
     
     def load_druid_services(self):
        for f in os.listdir(self.base_config):
@@ -156,54 +150,45 @@ class Model:
                 # TODO
                 continue
             if f == consts.COMMON_DIR:
-                service = CommonService()
+                service = Service(consts.COMMON_SERVICE)
             else:
-                service = DruidService(f)
+                service = Service(f)
             service.load_base(full_path)
             self.services[f] = service
 
-    def resolve_services(self):
+    def build_service_config(self):
+        config = {}
         for service in self.services.values():
-            service.resolve(self.context)
+            config[service.name] = service.base_config
+        self.config_stack.add(config)
 
-    def apply_service_defaults(self):
-        for key, service in self.services.items():
-            try:
-                service.apply_config(self.default_config[key])
-            except KeyError:
-                pass
+    def build_default_config(self):
+        self.default_config = {
+            consts.ZK_SERVICE: {
+                consts.PROPERTIES_KEY: {
+                    'dataDir': '$dataDir/zk'
+                }
+            }
+        }
+        self.config_stack.add(self.default_config)
+
+    def build_user_config(self):
+        self.walk_includes(
+            lambda template: self.config_stack.add(template.services())
+        )
+
+    def resolve_config(self):
+        self.final_config = self.config_stack.resolve(self.context)
     
-    def apply_service_overrides(self):
-        pass
-
     def build(self):
         builder = ConfigBuilder(self)
         builder.build()
 
     def print_config(self):
         print("Context:")
-        for k in sort_keys(self.context.keys()):
-            print_value(k, self.context.get_value(k))
+        print(str(self.context))
 
-def sort_keys(s):
-    keys = [k for k in s]
-    keys.sort()
-    return keys
+    def print_model(self):
+        print("Model:")
+        print(str(self.final_config))
 
-def print_value(k, v):
-    if v is None:
-        print('  {}: <unset>'.format(k))
-        return
-    if type(v) != str:
-        print('  {}: {}'.format(k, v))
-    if v.find('\n') != -1:
-        print('  {}: """'.format(k))
-        lines = v.strip().split('\n')
-        for line in lines:
-            print('    | {}'.format(line))
-        print('    """')
-        return
-    if v != v.strip():
-        print('  {}: "{}"'.format(k, v))
-        return
-    print('  {}: {}'.format(k, v))

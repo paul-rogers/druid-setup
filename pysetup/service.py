@@ -91,6 +91,7 @@ services = {
     consts.MASTER_SERVICE: druidService,
     consts.INDEXER_SERVICE: druidService,
     consts.PEON_SERVICE: druidService,
+    consts.MIDDLE_MANAGER_SERVICE: druidService,
     consts.COMMON_SERVICE: ServiceDefn([
         jvmResource,
         commonResource,
@@ -103,44 +104,29 @@ services = {
 
 class Service:
 
-    def __init__(self, name, defn):
+    def __init__(self, name):
         self.name = name
-        self.defn = defn
+        self.defn = services[name]
         self.base_config = {}
-        self.overrides = ConfigStack()
 
     def load_base(self, conf_dir):
         for resource in self.defn.resources():
             self.load_resource(conf_dir, resource)
-        self.overrides.add(ConfigGroup(self.base_config))
     
     def load_resource(self, conf_dir, resource):
         file_path = path.join(conf_dir, resource.file_name)
         if not path.isfile(file_path):
             return
-        self.base_config[resource.key] = ConfigGroup(resource.codec.read(file_path))
+        self.base_config[resource.key] = resource.codec.read(file_path)
 
-    def apply_config(self, config):
-        layer = {}
-        for resource in self.defn.resources():
-            values = config.get(resource.key, None)
-            if values is None or len(values) == 0:
-                continue
-            layer[resource.key] = resource.codec.encode(values)
-        self.overrides.add(layer)
-
-    def resolve(self, context):
-        self.overrides.resolve(context)
-
-    def build_config(self, dest_dir, context):
+    def build_config(self, dest_dir, final_config):
         os.makedirs(dest_dir)
         for resource in self.defn.resources():
-            config = self.overrides.get(resource.key)
+            config = final_config.get(resource.key)
             if config is None:
                 continue
             resource.codec.write(config.resolved(),
                 path.join(dest_dir, resource.file_name))
     
-    def build_data(self, dest_dir, context):
+    def build_data(self, context):
         self.defn.build_data_dir(context)
-

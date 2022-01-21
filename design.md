@@ -37,15 +37,21 @@ Should the file be Python or JSON? Python is executable, but JSON (or YAML) may 
 If YAML for a specific config:
 
 ```text
-targetDir: ~/apps/example`
-configDir: config
-dataDir: var
+targetDir: ~/apps/example
+configDir: $targetDir/config
+dataDir: ~/data/example
 base-config: micro-quickstart
-historical:
-  - config:
-      foo: bar
-  - jvm:
-      foo
+includes:
+  - base.yaml
+context:
+  - heapMem: 2G
+  - directmem: 1G
+services:
+  - historical:
+    - config:
+        foo: bar
+    - jvm:
+        foo
 ```
 
 ## Operation

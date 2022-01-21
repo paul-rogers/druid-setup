@@ -1,4 +1,6 @@
 from .codec import tombstone
+from .context import Context
+from .util import sort_keys, format_pair
 
 class ConfigStack:
 
@@ -6,6 +8,8 @@ class ConfigStack:
         self.stack = []
 
     def add(self, config):
+        if config is None or len(config) == 0:
+            return
         self.stack.append(config)
 
     def get(self, key):
@@ -17,16 +21,19 @@ class ConfigStack:
                 return value
         return None
 
-    def flatten(self):
-        result = {}
-        for layer in reversed(self.stack):
-            merge(result, layer)
-        return result
+    def merge(self):
+        merged = {}
+        for layer in self.stack:
+            merge(merged, layer)
+        return merged
 
     def resolve(self, context):
-        result = self.flatten()
+        result = self.merge()
         resolve(result, context)
         return FinalConfig(result)
+
+    def to_context(self, sys_context):
+        return Context(sys_context, self.merge())
 
 class FinalConfig:
 
@@ -50,6 +57,12 @@ class FinalConfig:
         if type(value) is not dict:
             raise Exception("Value of key is not a dict: " + key)
         return FinalConfig(value)
+
+    def __str__(self):
+        s = ''
+        for k in sort_keys(self.config):
+            s += format_pair(k, self.config[k], '') + '\n'
+        return s
         
 def split_key(key):
     return key.split('.')
@@ -71,7 +84,7 @@ def search(config, key):
 
 def merge(merged, overlay):
     for k, v in overlay.items():
-        if v is tombstone or v is None:
+        if v is tombstone:
             merged.pop(k, None)
             continue
         existing = merged.get(k, None)
@@ -82,7 +95,7 @@ def merge(merged, overlay):
                 merged[k] = v            
         else:
             if type(existing) == dict:
-                merged[k] = merge(existing, v)
+                merge(existing, v)
             else:
                 merged[k] = v
 
