@@ -1,18 +1,44 @@
+druidHome: /tmp/apache-druid-0.12
 target: $home/apps/example
-configDir: $targetDir/config
-dataDir: $home/data/example
 baseConfig: micro-quickstart
 include:
   - base.yaml
   - /tmp/std.yaml
 context:
+  dataDir: $home/data/example
   heapMem: 2G
   directMem: 1G
-  dataDir: doomed
-services:
-  historical:
-    runtime:
-      foo: bar
+  configDir: $targetDir/config
+  target: doomed
+custom:
+  whizbang:
     jvm:
-      foo:
-
+      kind: jvm
+      copy: historical
+    properties:
+      kind: properties
+      name: 'runtime.properties'
+      config:
+        druid.service: whizbang
+        druid.port: 8092
+    main:
+      kind: main
+      name: 'main.config'
+      config:
+        main: org.apache.druid.cli.Main
+        args: server whizbang
+services:
+  - whizbang
+  - broker
+  - router
+exclude:
+  - router
+  - indexer
+historical:
+  runtime:
+    foo: bar
+  jvm:
+    foo:
+whizbang:
+  properties:
+    foo.bar: mumble

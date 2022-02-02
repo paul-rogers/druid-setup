@@ -39,7 +39,9 @@ class FileCodec:
 
     def write(self, file_path, config):
         with open(file_path, 'w') as f:
-            f.write(config['contents'])
+            for line in config['contents']:
+                f.write(line)
+                f.write('\n')
 
 mainCodec = MainCodec()
 fileCodec = FileCodec()

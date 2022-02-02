@@ -18,7 +18,7 @@ class TestJvmCodec(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tempdir:
             dest = path.join(tempdir, "out-jvm.config")
-            jvmCodec.write(config, dest)
+            jvmCodec.write(dest, config)
             expected = 'data/out-jvm.config'
             self.assertTrue(filecmp.cmp(dest, expected))
 

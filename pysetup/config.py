@@ -1,5 +1,5 @@
 from .context import Context
-from .util import sort_keys, format_pair
+from .util import sort_keys, format_pair, search, resolve, merge
 from .consts import TOMBSTONE
 
 
@@ -34,30 +34,26 @@ class ConfigStack:
         return FinalConfig(resolved)
 
     def to_context(self, sys_context):
-        return Context(sys_context, self.merge())
+        return Context(self.merge(), sys_context)
 
 class FinalConfig:
 
     def __init__(self, config):
         self.config = config
 
-    def get(self, key):
+    def get_value(self, key):
         if type(key) == str:
             key = split_key(key)
         value, found = search(self.config, key)
         return value if found else None
 
-    def get_value(self, key, context):
-        value = self.get(key)
-        return context.replace(value)
-
-    def get_config(self, key):
-        value = self.get(key)
-        if value is None:
-            return value
-        if type(value) is not dict:
-            raise Exception("Value of key is not a dict: " + key)
-        return FinalConfig(value)
+    def get(self, key):
+        if type(key) == str:
+            key = key.split('.')
+        value, found = search(self.config, key)
+        if not found:
+            raise Exception("Variable '" + '.'.join(key) + "' is not defined.")
+        return value
 
     def __str__(self):
         s = ''
@@ -68,46 +64,3 @@ class FinalConfig:
 def split_key(key):
     return key.split('.')
    
-def search(config, key):
-    if len(key) == 0:
-        return config
-    value = config.get(key[0])
-    if value is None:
-        return (None, False)
-    elif value is TOMBSTONE:
-        return (None, True)
-    elif type(value) is dict:
-        return search(value, key[1:])
-    elif len(key) == 1:
-        return (value, True)
-    else:
-        return (None, False)
-
-def merge(merged, overlay):
-    for k, v in overlay.items():
-        if v is TOMBSTONE:
-            merged.pop(k, None)
-            continue
-        existing = merged.get(k, None)
-        if existing is None:
-            if type(existing) is dict:
-                merged[k] = existing.copy()
-            else:
-                merged[k] = v            
-        else:
-            if type(existing) == dict:
-                merge(existing, v)
-            else:
-                merged[k] = v
-
-def resolve(value, context):
-    if value is None:
-        return None
-    if type(value) is str:
-        return context.replace(value)
-    if type(value) is not dict:
-        return value
-    resolved = {}
-    for k, v in value.items():
-        resolved[k] = resolve(v, context)
-    return resolved

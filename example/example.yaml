@@ -1,4 +1,4 @@
-druidHome: /Users/paul/bin/archive/apache-druid-0.23.0-SNAPSHOT
+druidHome: /Users/paul/bin/apache-druid-2022.01.0-iap-SNAPSHOT
 target: /tmp/test
 baseConfig: micro-quickstart
 context:

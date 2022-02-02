@@ -2,13 +2,51 @@ import yaml
 from os import path
 from . import consts
 
-prop_names = [
+context_keys = [
+    consts.BASE_CONFIG_KEY,
     consts.DRUID_HOME_KEY,
     consts.TARGET_KEY,
-    consts.BASE_CONFIG_KEY,
-    consts.DATA_DIR_KEY,
-    consts.CONFIG_DIR_KEY,
 ]
+metadata_keys = [
+    consts.CUSTOM_KEY,
+    consts.EXCLUDE_KEY,
+    consts.SERVICES_KEY,
+]
+
+class TemplateSet:
+
+    def __init__(self, root_template):
+        self.root_template = root_template
+        self.templates = [Template(self.root_template)]
+
+    def load(self):
+        self.expand_includes(self.templates[0])
+
+    def expand_includes(self, template):
+        for f in template.includes():
+            include = None
+            for t in self.templates:
+                if f == t.file_path:
+                    include = t
+                    break
+            if include is None:
+                include = Template(f)
+                self.templates.append(include)
+                self.expand_includes(include)
+            template.add_depenency(include)
+
+    def walk_includes(self, fn):
+        for include in self.templates:
+            include.touched = False
+        self.visit_template(self.templates[0], fn)
+    
+    def visit_template(self, template, fn):
+        if template.touched:
+            return
+        template.touched = True
+        for include in template.dependencies:
+            self.visit_template(include, fn)
+        fn(template)
 
 class Template:
 
@@ -22,48 +60,54 @@ class Template:
 
         with open(self.path) as f:
             self.raw = yaml.load(f, Loader=yaml.Loader)
+            self.remainder = self.raw.copy()
 
         self.gather_context()
+        self.gather_includes()
+        self.gather_metadata()
         self.gather_services()
 
     def gather_context(self):
-        context = self.raw.get(consts.CONTEXT_KEY, None)
-        context = {} if context is None else context
-        if context is None:
-            context = {}
-        for k in prop_names:
-            v = self.raw.get(k, None)
+        self._context = self.remainder.pop(consts.CONTEXT_KEY, {})
+        for k in context_keys:
+            v = self.remainder.pop(k, None)
             if v is not None:
-                context[k] = v
-        self.config[consts.CONTEXT_KEY] = context
+                self._context[k] = v
 
-    def gather_services(self):
-        services = self.raw.get(consts.SERVICES_KEY, None)
-        if services is not None and len(services) > 0:
-            self.config[consts.SERVICES_KEY] = services
-
-    def includes(self):
-        try:
-            includes = self.raw[consts.INCLUDE_KEY]
-        except KeyError:
-            return []
-        if type(includes) is str:
-            includes = [includes]
-        resolved = []
-        for f in includes:
+    def gather_includes(self):
+        self._includes = self.remainder.pop(consts.INCLUDE_KEY, [])
+        if type(self._includes) is str:
+            self._includes = [self._includes]
+        self.resolved_includes = []
+        for f in self._includes:
             if len(f) == 0:
                 continue
             if f[0] in ['/', '~', '$']:
-                resolved.append(f)
+                self.resolved_includes.append(f)
             else:
-                resolved.append(path.join(self.dir, f))
-        return resolved
+                self.resolved_includes.append(path.join(self.dir, f))
+
+    def gather_metadata(self):
+        self._metadata = {}
+        for key in metadata_keys:
+            value = self.remainder.pop(key, None)
+            if not value is None:
+                self._metadata[key] = value
+
+    def gather_services(self):
+        self._services = self.remainder
+
+    def includes(self):
+        return self.resolved_includes
+
+    def metadata(self):
+        return self._metadata
 
     def context(self):
-        return self.config.get(consts.CONTEXT_KEY, None)
+        return self._context
 
     def services(self):
-        return self.config.get(consts.SERVICES_KEY, None)
+        return self._services
 
     def add_dependency(self, include):
         self.dependencies.add(include)

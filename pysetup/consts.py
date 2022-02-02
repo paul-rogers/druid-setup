@@ -12,6 +12,14 @@ BASE_ZK_DIR_KEY = 'baseZkDir'
 README_KEY = 'readme'
 TODAY_KEY = 'today'
 DISCLAIMER_KEY = 'disclaimer'
+CONFIG_DIR_KEY = 'confDir'
+ZK_CONFIG_DIR_KEY = 'zkConfDir'
+DRUID_CONFIG_DIR_KEY = 'druidConfDir'
+SUPERVISE_CONFIG_DIR_KEY = 'superviseConfDir'
+SUPERVISE_CONFIG_NAME_KEY = 'superviseName'
+CONFIGS_KEY = 'configs'
+COPY_KEY = 'copy'
+CONFIG_KEY = 'config'
 
 # Service names
 HISTORICAL_SERVICE = 'historical'
@@ -30,7 +38,8 @@ SERVICES_KEY = 'services'
 INCLUDE_KEY = 'include'
 CONTEXT_KEY = 'context'
 COMMON_KEY = 'common'
-CONFIG_DIR_KEY = 'configDir'
+EXCLUDE_KEY = 'exclude'
+CUSTOM_KEY = 'custom'
 
 # Other properties
 PROPERTIES_KEY = 'properties'
@@ -59,6 +68,8 @@ COMMON_PROPERTIES_FILE = 'common.runtime.properties'
 LOG4J_FILE = 'log4j2.xml'
 ZOO_CFG_FILE = 'zoo.cfg'
 COMMON_DIR = '_common'
+DRUID_DIR = 'druid'
+CONF_DIR = 'conf'
 
 # Service Names
 

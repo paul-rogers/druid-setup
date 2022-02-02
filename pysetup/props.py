@@ -1,7 +1,7 @@
 import re, json
 from . import consts
 
-comment = '([^"#]*)(?:#|//)(.*)'
+comment = '([^"#]*)(#.*)'
 
 class ConfigValue:
 
@@ -12,7 +12,8 @@ class ConfigValue:
     def write(self, key, out):
         if self.comments is not None and len(self.comments) > 0:
             for line in self.comments:
-                out.write("# {}\n".format(line))
+                out.write(line)
+                out.write('\n')
         if self.value is not None:
             write_value(key, self.value, out)
 
@@ -97,7 +98,7 @@ class PropertiesCodec:
     def read(self, file_path) -> dict:
         return PropsParser().parse(file_path)
 
-    def write(self, config, file_path):
+    def write(self, file_path, config):
         with open(file_path, 'w') as f:
             for k, v in config.items():
                 if type(v) == ConfigValue:

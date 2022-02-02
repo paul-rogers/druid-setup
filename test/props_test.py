@@ -11,11 +11,11 @@ class TestPropertiesCodec(unittest.TestCase):
         self.assertIsNotNone(propertiesCodec)
         source = 'data/runtime.properties'
         config = propertiesCodec.read(source)
-        self.assertEquals(11, len(config))
+        self.assertEqual(11, len(config))
 
         with tempfile.TemporaryDirectory() as tempdir:
             dest = path.join(tempdir, "out-runtime.properties")
-            propertiesCodec.write(config, dest)
+            propertiesCodec.write(dest, config)
             expected = 'data/out-runtime.properties'
             self.assertTrue(filecmp.cmp(dest, expected))
 

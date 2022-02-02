@@ -13,7 +13,7 @@ f: """
 class TestContext(unittest.TestCase):
 
     def test_empty_context(self):
-        c = Context({}, {})
+        c = Context({})
         self.assertIsNone(c.get_value('foo'))
         self.assertEqual('', c.get('foo'))
         try:
@@ -25,7 +25,7 @@ class TestContext(unittest.TestCase):
         self.assertEqual(0, len(c.keys()))
 
     def test_vars(self):
-        c = Context({}, {
+        c = Context({
             'prop1': 'a', 
             'prop2': 'd', 
             'prop3': '${x}', 
@@ -50,18 +50,18 @@ class TestContext(unittest.TestCase):
         self.assertEqual(7, len(c.keys()))
 
     def test_indirection(self):
-        c = Context({}, {'foo': 'bar', 'bar': 'mumble'})
+        c = Context({'foo': 'bar', 'bar': 'mumble'})
         self.assertEqual('mumble', c.replace('$$foo'))
 
     def test_non_string(self):
-        c = Context({}, {'p1': None, 'p2': 10})
+        c = Context({'p1': None, 'p2': 10})
         self.assertEqual('', c.replace('$p1'))
         self.assertEqual('10', c.replace('$p2'))
         self.assertEqual('a//b/10/c', c.replace('a/$p1/b/$p2/c'))
 
     def test_system(self):
         sys_props = {}
-        c = Context(sys_props, {'p1': 'foo', 'p2': '$sys', 'p3': '$p1'})
+        c = Context({'p1': 'foo', 'p2': '$sys', 'p3': '$p1'}, sys_props)
         self.assertEqual('foo', c.get('p1'))
         self.assertEqual('foo', c.get('p3'))
 
@@ -73,7 +73,7 @@ class TestContext(unittest.TestCase):
 
     def test_to_str(self):
         d = {'c': 10, 'd': 'foo', 'e': ' bar ', 'f': 'two\nlines'}
-        c = Context({}, d)
+        c = Context(d)
         self.assertEqual(expected_fmt, str(c))
 
 if __name__ == '__main__':

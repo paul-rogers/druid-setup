@@ -71,7 +71,7 @@ class JvmCodec:
             return
         print("Did not match jvm.config line:", line)
 
-    def write(self, config, file_path):
+    def write(self, file_path, config):
         with open(file_path, 'w') as f:
             self.write_jvm_args(f, config)
             self.write_system_props(f, config)

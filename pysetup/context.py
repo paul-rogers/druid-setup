@@ -49,7 +49,7 @@ class Context:
       "foo=$foo" will loop forever.
     """
 
-    def __init__(self, system, mapping):
+    def __init__(self, mapping, system={}):
         self.system_props = system
         self.mapping = mapping
 
